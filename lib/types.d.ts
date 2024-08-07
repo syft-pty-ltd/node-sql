@@ -70,7 +70,7 @@ declare module "sql" {
 			n1: Column<N1, T1>,
 			n2: Column<N2, T2>,
 			n3: Column<N3, T3>): Query<{ [N in N1]: T1 } & { [N in N2]: T2 } & { [N in N3]: T3 }>
-		select<U>(...nodesOrTables: any[]): Query<U>
+		// select<U>(...nodesOrTables: any[]): Query<U>
 		select<Cols extends any[]>(...nodes: Cols): Query<UnionToIntersection<
 			Cols[number] extends (TableDotStar<any, infer TT>) ?
 			TT :
