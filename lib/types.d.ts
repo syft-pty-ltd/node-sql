@@ -14,7 +14,7 @@ declare module "sql" {
 		| "sqlite"
 		;
 
-	interface OrderByValueNode {}
+	interface OrderByValueNode { }
 
 	interface Named<Name extends string> {
 		name?: Name;
@@ -24,7 +24,7 @@ declare module "sql" {
 		dataType: string;
 		primaryKey?: boolean;
 		references?: {
-			table:string;
+			table: string;
 			column: string;
 			onDelete?: 'restrict' | 'cascade' | 'no action' | 'set null' | 'set default';
 			onUpdate?: 'restrict' | 'cascade' | 'no action' | 'set null' | 'set default';
@@ -37,7 +37,7 @@ declare module "sql" {
 	interface TableDefinition<Name extends string, Row> {
 		name: Name;
 		schema: string;
-		columns: {[CName in keyof Row]: ColumnDefinition<CName, Row[CName]>};
+		columns: { [CName in keyof Row as CName extends string ? CName : never]: ColumnDefinition<CName extends string ? CName : never, Row[CName]> };
 		dialect?: SQLDialects;
 		isTemporary?: boolean;
 		foreignKeys?: {
@@ -51,112 +51,128 @@ declare module "sql" {
 
 	interface QueryLike {
 		values: any[]
-		text:string
+		text: string
 	}
 
 	interface Executable {
-		toQuery():QueryLike;
+		toQuery(): QueryLike;
 	}
 
 	interface Queryable<T> extends Executable {
-		where(...nodes:any[]):Query<T>
-		delete():ModifyingQuery
-		select(star: Column<void, void>): Query<T>;
-		select<N1 extends string, T1>(n1: Column<N1, T1>):Query<{[N in N1]: T1}>;
-		select<N1 extends string, T1, N2 extends string, T2>(
-				n1: Column<N1, T1>,
-				n2: Column<N2, T2>):Query<{[N in N1]: T1} & {[N in N2]: T2}>
-		select<N1 extends string, T1, N2 extends string, T2, N3 extends string, T3>(
-				n1: Column<N1, T1>,
-				n2: Column<N2, T2>,
-				n3: Column<N3, T3>):Query<{[N in N1]: T1} & {[N in N2]: T2} & {[N in N3]: T3}>
-		select<U>(...nodesOrTables:any[]):Query<U>
-
+		where(...nodes: any[]): Query<T>
+		delete(): ModifyingQuery
+		select<Cols extends any[]>(...nodes: Cols): Query<UnionToIntersection<
+			Cols[number] extends (TableDotStar<any, infer TT>) ?
+			TT :
+			Cols[number] extends (TableDotStar<any, infer TT> | Column<any, any>) ?
+			TT & { [col in Cols[number]as col['name']]: col['type'] } :
+			any
+		>>;
+		distinct(): Query<T>;
 	}
 
 	interface Query<T> extends Executable, Queryable<T> {
 		resultType: T;
 
-		from(table:TableNode):Query<T>
-		from(statement:string):Query<T>
-		update(o:{[key: string]:any}):ModifyingQuery
-		update(o:{}):ModifyingQuery
-		group(...nodes:any[]):Query<T>
-		order(...criteria:OrderByValueNode[]):Query<T>
-		limit(l:number):Query<T>
-		offset(o:number):Query<T>
+		from(table: TableNode): Query<T>
+		from(statement: string): Query<T>
+		update(o: { [key: string]: any }): ModifyingQuery
+		update(o: {}): ModifyingQuery
+		group(...nodes: any[]): Query<T>
+		order(...criteria: OrderByValueNode[]): Query<T>
+		limit(l: number): Query<T>
+		offset(o: number): Query<T>
 	}
 
 	interface SubQuery<T> {
-		select<Name>(node:Column<Name, T>):SubQuery<T>
-		select(...nodes: any[]):SubQuery<T>
-		where(...nodes:any[]):SubQuery<T>
-		from(table:TableNode):SubQuery<T>
-		from(statement:string):SubQuery<T>
-		group(...nodes:any[]):SubQuery<T>
-		order(criteria:OrderByValueNode):SubQuery<T>
-		exists():BinaryNode
+		select<Name>(node: Column<Name, T>): SubQuery<T>
+		select(...nodes: any[]): SubQuery<T>
+		where(...nodes: any[]): SubQuery<T>
+		from(table: TableNode): SubQuery<T>
+		from(statement: string): SubQuery<T>
+		group(...nodes: any[]): SubQuery<T>
+		order(criteria: OrderByValueNode): SubQuery<T>
+		exists(): BinaryNode
 		notExists(): BinaryNode;
-		notExists(subQuery:SubQuery<any>):BinaryNode
+		notExists(subQuery: SubQuery<any>): BinaryNode
 	}
 
 
 	interface ModifyingQuery extends Executable {
-		returning<U>(...nodes:any[]):Query<U>
-		where(...nodes:any[]):ModifyingQuery
+		returning<Cols extends any[]>(...nodes: Cols): Query<UnionToIntersection<
+			Cols[number] extends (TableDotStar<any, infer TT>) ?
+			TT :
+			Cols[number] extends (TableDotStar<any, infer TT> | Column<any, any>) ?
+			TT & { [col in Cols[number]as col['name']]: col['type'] } :
+			any
+		>>
+		where(...nodes: any[]): ModifyingQuery
+		onConflict(...nodes: any[]): ModifyingQuery
 	}
 
 	interface TableNode {
-		join(table:TableNode):JoinTableNode
-		leftJoin(table:TableNode):JoinTableNode
+		join(table: TableNode): JoinTableNode
+		leftJoin(table: TableNode): JoinTableNode
 	}
 
 	interface JoinTableNode extends TableNode {
-		on(filter:BinaryNode):TableNode
-		on(filter:string):TableNode
+		on(filter: BinaryNode): TableNode
+		on(filter: string): TableNode
 	}
 
 	interface CreateQuery extends Executable {
-		ifNotExists():Executable
+		ifNotExists(): Executable
 	}
 	interface DropQuery extends Executable {
-		ifExists():Executable
+		ifExists(): Executable
 	}
 
 	type Columns<T> = {
 		[Name in keyof T]: Column<Name, T[Name]>
 	}
+
+	type UnionToIntersection<U> =
+		(U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
+
+	type TableDotStar<Name, Type> = {
+		name: Name;
+		type: never;
+		tableName: Name;
+		tableType: Type;
+		isTableDotStar: true;
+	}
+
 	type Table<Name extends string, T> = TableNode & Queryable<T> & Named<Name> & Columns<T> & {
 		getName(): string;
 		getSchema(): string;
 
 		literal(statement: string): any;
 
-		create():CreateQuery
-		drop():DropQuery
-		as<OtherName extends string>(name:OtherName):Table<OtherName, T>
-		update(o: Partial<T>):ModifyingQuery
-		insert(row:T):ModifyingQuery
-		insert(rows:T[]):ModifyingQuery
-		select():Query<T>
-		select<U>(...nodes:any[]):Query<U>
-		from<U>(table:TableNode):Query<U>
-		from<U>(statement:string):Query<U>
-		star():Column<void, void>
-		subQuery<U>():SubQuery<U>
-		columns:Column<void, void>[]
+		create(): CreateQuery
+		drop(): DropQuery
+		as<OtherName extends string>(name: OtherName): Table<OtherName, T>
+		update(o: Partial<T>): ModifyingQuery
+		insert(row: Partial<T> | Partial<T>[]): ModifyingQuery
+		insert(rows: T[]): ModifyingQuery
+		select(): Query<T>
+		select<U>(...nodes: any[]): Query<U>
+		from<U>(table: TableNode): Query<U>
+		from<U>(statement: string): Query<U>
+		star(): TableDotStar<Name, T>
+		subQuery<U>(): SubQuery<U>
+		columns: Column<void, void>[]
 		sql: SQL;
-		alter():AlterQuery<T>;
+		alter(): AlterQuery<T>;
 		indexes(): IndexQuery;
 	}
 
 	interface AlterQuery<T> extends Executable {
-		addColumn(column:Column<any, any>): AlterQuery<T>;
-		addColumn(name: string, options:string): AlterQuery<T>;
-		dropColumn(column: Column<any, any>|string): AlterQuery<T>;
-		renameColumn(column: Column<any, any>, newColumn: Column<any, any>):AlterQuery<T>;
-		renameColumn(column: Column<any, any>, newName: string):AlterQuery<T>;
-		renameColumn(name: string, newName: string):AlterQuery<T>;
+		addColumn(column: Column<any, any>): AlterQuery<T>;
+		addColumn(name: string, options: string): AlterQuery<T>;
+		dropColumn(column: Column<any, any> | string): AlterQuery<T>;
+		renameColumn(column: Column<any, any>, newColumn: Column<any, any>): AlterQuery<T>;
+		renameColumn(column: Column<any, any>, newName: string): AlterQuery<T>;
+		renameColumn(name: string, newName: string): AlterQuery<T>;
 		rename(newName: string): AlterQuery<T>
 	}
 	interface IndexQuery {
@@ -168,7 +184,7 @@ declare module "sql" {
 	interface IndexCreationQuery extends Executable {
 		unique(): IndexCreationQuery;
 		using(name: string): IndexCreationQuery;
-		on(...columns: (Column<any, any>|OrderByValueNode)[]): IndexCreationQuery;
+		on(...columns: (Column<any, any> | OrderByValueNode)[]): IndexCreationQuery;
 		withParser(parserName: string): IndexCreationQuery;
 		fulltext(): IndexCreationQuery;
 		spatial(): IndexCreationQuery;
@@ -176,46 +192,53 @@ declare module "sql" {
 
 	interface SQL {
 		functions: {
-				LOWER<Name>(c:Column<Name, string>):Column<Name, string>
+			LOWER<Name>(c: Column<Name, string>): Column<Name, string>
 		}
 	}
 
 	interface BinaryNode {
-		and(node:BinaryNode):BinaryNode
-		or(node:BinaryNode):BinaryNode
+		and(node: BinaryNode): BinaryNode
+		or(node: BinaryNode): BinaryNode
 	}
 
 	interface Column<Name, T> {
 		name: Name
-		in(arr:T[]):BinaryNode
-		in(subQuery:SubQuery<T>):BinaryNode
-		notIn(arr:T[]):BinaryNode
-		equals(node: T|Column<any, T>):BinaryNode
-		notEquals(node: T|Column<any, T>):BinaryNode
-		gte(node: T|Column<any, T>):BinaryNode
-		lte(node: T|Column<any, T>):BinaryNode
-		gt(node:T|Column<any, T>):BinaryNode
-		lt(node: T|Column<any, T>):BinaryNode
-		like(str:string):BinaryNode
-		multiply:{
-				(node:Column<any, T>):Column<any, T>
-				(n:number):Column<any, number> //todo check column names
+		type: T
+		in(arr: T[]): BinaryNode
+		in(subQuery: SubQuery<T>): BinaryNode
+		notIn(arr: T[]): BinaryNode
+		equals(node: T | Column<any, T>): BinaryNode
+		equals(node: T | Column<any, T extends null ? T | null : T> | SubQuery<T>): BinaryNode
+		notEquals(node: T | Column<any, T>): BinaryNode
+		gte(node: T | Column<any, T>): BinaryNode
+		lte(node: T | Column<any, T>): BinaryNode
+		gt(node: T | Column<any, T>): BinaryNode
+		lt(node: T | Column<any, T>): BinaryNode
+		like(str: string): BinaryNode
+		ilike(str: string): BinaryNode
+		multiply: {
+			(node: Column<any, T>): Column<any, T>
+			(n: number): Column<any, number> //todo check column names
 		}
-		isNull():BinaryNode
-		isNotNull():BinaryNode
+		isNull(): BinaryNode
+		isNotNull(): BinaryNode
+		keyText<K extends keyof T>(str: K): Column<Name, T[K]>
+		plus(num: number): number
 		//todo check column names
-		sum():Column<any, number>
-		count():Column<any, number>
-		count(name:string):Column<any, number>
-		distinct():Column<Name, T>
-		as<OtherName>(name:OtherName):Column<OtherName, T>
-		ascending:OrderByValueNode
-		descending:OrderByValueNode
-		asc:OrderByValueNode
-		desc:OrderByValueNode
+		sum(): Column<any, number>
+		count(): Column<any, number>
+		count(name: string): Column<any, number>
+		distinct(): Column<Name, T>
+		as<NewName extends string>(name: NewName): Column<NewName, T>;
+		cast<T2>(format: string): Column<Name, T2>
+		ascending: OrderByValueNode
+		descending: OrderByValueNode
+		asc: OrderByValueNode
+		desc: OrderByValueNode
 	}
 
-	function define<Name extends string, T>(map:TableDefinition<Name, T>): Table<Name, T>;
+	function define<Name extends string, T>(map: TableDefinition<Name, T>): Table<Name, T>;
 	function setDialect(dialect: SQLDialects): void;
-
+	function functionCallCreator(functionName: string): any;
+	const functions: any;
 }
