@@ -61,16 +61,16 @@ declare module "sql" {
 	interface Queryable<T> extends Executable {
 		where(...nodes: any[]): Query<T>
 		delete(): ModifyingQuery
-		select(star: Column<void, void>): Query<T>;
-		select<N1 extends string, T1>(n1: Column<N1, T1>): Query<{ [N in N1]: T1 }>;
-		select<N1 extends string, T1, N2 extends string, T2>(
-			n1: Column<N1, T1>,
-			n2: Column<N2, T2>): Query<{ [N in N1]: T1 } & { [N in N2]: T2 }>
-		select<N1 extends string, T1, N2 extends string, T2, N3 extends string, T3>(
-			n1: Column<N1, T1>,
-			n2: Column<N2, T2>,
-			n3: Column<N3, T3>): Query<{ [N in N1]: T1 } & { [N in N2]: T2 } & { [N in N3]: T3 }>
-		// select<U>(...nodesOrTables: any[]): Query<U>
+		// select(star: Column<void, void>): Query<T>;
+		// select<N1 extends string, T1>(n1: Column<N1, T1>): Query<{ [N in N1]: T1 }>;
+		// select<N1 extends string, T1, N2 extends string, T2>(
+		// 	n1: Column<N1, T1>,
+		// 	n2: Column<N2, T2>): Query<{ [N in N1]: T1 } & { [N in N2]: T2 }>
+		// select<N1 extends string, T1, N2 extends string, T2, N3 extends string, T3>(
+		// 	n1: Column<N1, T1>,
+		// 	n2: Column<N2, T2>,
+		// 	n3: Column<N3, T3>): Query<{ [N in N1]: T1 } & { [N in N2]: T2 } & { [N in N3]: T3 }>
+		// // select<U>(...nodesOrTables: any[]): Query<U>
 		select<Cols extends any[]>(...nodes: Cols): Query<UnionToIntersection<
 			Cols[number] extends (TableDotStar<any, infer TT>) ?
 			TT :
